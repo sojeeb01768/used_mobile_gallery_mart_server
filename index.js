@@ -53,6 +53,16 @@ async function run() {
             const result = await bookingsCollection.insertOne(booking);
             res.send(result);
         })
+
+        // get bookings data
+        app.get('/bookings', async (req, res) => {
+            const email = req.query.buyerEmail;
+            const query = { email: email };
+            const bookings = await bookingsCollection.find(query).toArray();
+            res.send(bookings);
+
+        })
+
     }
     finally {
 
