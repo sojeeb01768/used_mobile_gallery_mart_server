@@ -20,22 +20,20 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
 
-// jwt function
+// // jwt function
 function verifyJWT(req, res, next) {
     console.log("token inside VerifyJWT", req.headers.authorization);
     const authHeader = req.headers.authorization;
     if (!authHeader) {
-        res.status(401).send('Unathorized Access')
+        res.status(401).send('Unauthorized Access')
     }
-
     const token = authHeader.split(' ')[1];
-
     jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
         if (err) {
             return res.status(403).send({ message: 'forbidden access' })
-            req.decoded = decoded;
-            next();
         }
+        req.decoded = decoded;
+        next();
     })
 
 }
@@ -78,13 +76,14 @@ async function run() {
         })
 
         // get bookings data
-        app.get('/bookings', async (req, res) => {
+        app.get('/bookings', verifyJWT, async (req, res) => {
             const email = req.query.email;
-            // const decodedEmail = req.decoded.email;
+            console.log('token', req.headers.authorization);
 
-            // if (email !== decodedEmail) {
-            //     return res.status(403).send({ message: 'forbidden access' })
-            // }
+            const decodedEmail = req.decoded.email;
+            if (email !== decodedEmail) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
 
             const query = { buyerEmail: email };
             const bookings = await bookingsCollection.find(query).toArray();
@@ -115,17 +114,25 @@ async function run() {
 
         });
 
-        // put admin role to user data
-        app.put('/users/admin/:id', async (req, res) => {
+        // // put admin role to user data
+        app.put('/users/admin/:id',verifyJWT, async (req, res) => {
+          
+            const decodedEmail=req.decoded.email;
+            const query = {email: decodedEmail};
+            const user = usersCollection.findOne(query);
+            if(user?.userType !== 'admin'){
+                return res.status(403).send({message: 'forbidden access'})
+            }
+
             const id = req.params.id;
             const filter = { _id: ObjectId(id) }
             const option = { upsert: true }
             const updatedDoc = {
                 $set: {
-                    role: 'admin'
+                    userType: 'admin'
                 }
             }
-            const result = await usersCollection.updateOne(filter, option, updatedDoc);
+            const result = await usersCollection.updateOne(filter, updatedDoc, option)
             res.send(result)
         });
 
