@@ -53,11 +53,26 @@ async function run() {
             res.send(category);
         })
 
+        // get a product from database
         app.get('/products/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) };
             const products = await productsCollection.findOne(query);
             res.send(products)
+        });
+
+        // post product data from server to db
+        app.post('/products', async (req, res) => {
+            const product = req.body;
+            const result = await productsCollection.insertOne(product);
+            res.send(result)
+        });
+
+        // get my products from database
+        app.get('/products', async(req, res) => {
+            const query = {};
+            const result = await productsCollection.find(query).toArray();
+            res.send(result)
         })
 
         app.get('/category/:id', async (req, res) => {
@@ -103,6 +118,14 @@ async function run() {
             }
             console.log(user);
             res.status(403).send({ accessToken: '' });
+        });
+
+        //get single user data to prevent normal user to get admin panel
+        app.get('/users/admin/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email }
+            const user = await usersCollection.findOne(query);
+            res.send({ isAdmin: user?.userType === 'admin' });
         })
 
         // post users to database
@@ -115,13 +138,13 @@ async function run() {
         });
 
         // // put admin role to user data
-        app.put('/users/admin/:id',verifyJWT, async (req, res) => {
-          
-            const decodedEmail=req.decoded.email;
-            const query = {email: decodedEmail};
+        app.put('/users/admin/:id', verifyJWT, async (req, res) => {
+
+            const decodedEmail = req.decoded.email;
+            const query = { email: decodedEmail };
             const user = usersCollection.findOne(query);
-            if(user?.userType !== 'admin'){
-                return res.status(403).send({message: 'forbidden access'})
+            if (user?.userType !== 'admin') {
+                return res.status(403).send({ message: 'forbidden access' })
             }
 
             const id = req.params.id;
@@ -137,11 +160,23 @@ async function run() {
         });
 
 
-        // get user data from database
+        // get buyer and seller data from database
         app.get('/users', async (req, res) => {
-            const query = {};
+            const userType = req.query.userType;
+            const query = { userType: userType }
+            // const query = {}
             const users = await usersCollection.find(query).toArray();
             res.send(users);
+        })
+
+
+
+        //seller route only
+        app.get('/users/seller/:email', async(req, res)=> {
+            const email = req.params.email;
+            const query = {email}
+            const user = await usersCollection.findOne(query)
+            res.send({isSeller : user?.userType === 'seller'})
         })
 
     }
