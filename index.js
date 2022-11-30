@@ -94,14 +94,14 @@ async function run() {
         })
 
         // get bookings data
-        app.get('/bookings', verifyJWT, async (req, res) => {
+        app.get('/bookings', async (req, res) => {
             const email = req.query.email;
             console.log('token', req.headers.authorization);
 
-            const decodedEmail = req.decoded.email;
-            if (email !== decodedEmail) {
-                return res.status(403).send({ message: 'forbidden access' })
-            }
+            // const decodedEmail = req.decoded.email;
+            // if (email !== decodedEmail) {
+            //     return res.status(403).send({ message: 'forbidden access' })
+            // }
 
             const query = { buyerEmail: email };
             const bookings = await bookingsCollection.find(query).toArray();
@@ -150,7 +150,7 @@ async function run() {
                 }
             }
             const updatedResult = await bookingsCollection.updateOne(filter, updatedDoc)
-            res.send(result)
+            res.send(updatedResult)
         })
 
         // get jwt token 
