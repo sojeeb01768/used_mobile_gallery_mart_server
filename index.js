@@ -6,6 +6,8 @@ const { query } = require('express');
 const jwt = require('jsonwebtoken');
 
 require('dotenv').config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
 
 const app = express();
 
@@ -44,6 +46,7 @@ async function run() {
         const productsCollection = client.db('usedMobileGallery').collection('products');
         const bookingsCollection = client.db('usedMobileGallery').collection('bookings');
         const usersCollection = client.db('usedMobileGallery').collection('users');
+        const paymentsCollection = client.db('usedMobileGallery').collection('payments');
 
 
 
@@ -69,7 +72,7 @@ async function run() {
         });
 
         // get my products from database
-        app.get('/products', async(req, res) => {
+        app.get('/products', async (req, res) => {
             const query = {};
             const result = await productsCollection.find(query).toArray();
             res.send(result)
@@ -104,6 +107,50 @@ async function run() {
             const bookings = await bookingsCollection.find(query).toArray();
             res.send(bookings);
 
+        });
+
+        // get specific booking for payment
+        app.get('/bookings/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) }
+            const booking = await bookingsCollection.findOne(query);
+            res.send(booking);
+        });
+
+        // payment section
+        app.post("/create-payment-intent", async (req, res) => {
+            const booking = req.body;
+            const price = booking.price;
+            const amount = price * 100;
+
+
+            // Create a PaymentIntent with the order amount and currency
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: "usd",
+                "payment_method_types": [
+                    "card"
+                ]
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        });
+
+        // post payment info to database
+        app.post('/payments', async (req, res) => {
+            const payment = req.body;
+            const result = await paymentsCollection.insertOne(payment);
+            const id = payment.bookingId
+            const filter = { _id: ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId
+                }
+            }
+            const updatedResult = await bookingsCollection.updateOne(filter, updatedDoc)
+            res.send(result)
         })
 
         // get jwt token 
@@ -172,19 +219,35 @@ async function run() {
 
 
         //seller route only
-        app.get('/users/seller/:email', async(req, res)=> {
+        app.get('/users/seller/:email', async (req, res) => {
             const email = req.params.email;
-            const query = {email}
+            const query = { email }
             const user = await usersCollection.findOne(query)
-            res.send({isSeller : user?.userType === 'seller'})
+            res.send({ isSeller: user?.userType === 'seller' })
         });
 
         // buyer only route
-        app.get('/users/buyer/:email', async(req, res)=> {
+        app.get('/users/buyer/:email', async (req, res) => {
             const email = req.params.email;
-            const query = {email}
+            const query = { email }
             const user = await usersCollection.findOne(query)
-            res.send({isBuyer : user?.userType === 'buyer'})
+            res.send({ isBuyer: user?.userType === 'buyer' })
+        });
+
+        // delete product api 
+        app.delete('/products/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) }
+            const result = await productsCollection.deleteOne(filter);
+            res.send(result)
+        });
+
+        // delete buyer and seller api for admin only
+        app.delete('/users/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) }
+            const result = await usersCollection.deleteOne(filter);
+            res.send(result)
         });
 
     }
